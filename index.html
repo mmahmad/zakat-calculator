@@ -13,6 +13,30 @@
             <p class="subtitle">Calculate your annual Zakat obligation</p>
         </header>
 
+        <!-- Instructions Section -->
+        <section class="instructions-section">
+            <details>
+                <summary>How to Use This Calculator</summary>
+                <div class="instructions-content">
+                    <ol>
+                        <li><strong>Select a calculation date</strong> — Choose the date for which you want to calculate Zakat (e.g., your Zakat anniversary date).</li>
+                        <li><strong>Fetch rates</strong> — Click "Fetch Rates for Date" to get exchange rates and metal prices for that date.</li>
+                        <li><strong>Enter your assets:</strong>
+                            <ul>
+                                <li><strong>Cash:</strong> Enter amounts in each currency you hold.</li>
+                                <li><strong>Precious Metals:</strong> Enter the weight in grams for gold (by purity) and silver.</li>
+                                <li><strong>Stocks:</strong> Enter US stock symbols and number of shares. Either use "Fetch Prices" (requires running the local server) or click "Look up" to find prices on Yahoo Finance and enter them manually.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Calculate</strong> — Click "Calculate Zakat" to see your total wealth and Zakat due (2.5%).</li>
+                    </ol>
+                    <div class="instructions-note">
+                        <strong>Optional:</strong> To auto-fetch stock prices, run <code>pip install -r requirements.txt && python server.py</code> in your terminal.
+                    </div>
+                </div>
+            </details>
+        </section>
+
         <section class="date-section">
             <label for="calculation-date">Calculation Date:</label>
             <input type="date" id="calculation-date" required>
