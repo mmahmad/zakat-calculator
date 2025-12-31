@@ -134,50 +134,84 @@ function updateMetalPricesInBase() {
 }
 
 // Fetch exchange rates using Frankfurter API (free, no key required)
+// Note: Frankfurter only supports major currencies (USD, EUR, GBP, CNY, INR, etc.)
+// For unsupported currencies (SAR, PKR, AED, QAR, BHD, OMR), we use fallback rates
 async function fetchExchangeRates(dateStr, baseCurrency = 'USD') {
-    // Get all other currencies except the base
-    const targetCurrencies = CURRENCIES.filter(c => c !== baseCurrency).join(',');
-    const apiUrl = `https://api.frankfurter.app/${dateStr}?from=${baseCurrency}&to=${targetCurrencies}`;
+    // Currencies supported by Frankfurter API (ECB data)
+    const FRANKFURTER_SUPPORTED = ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'INR', 'AUD', 'CAD', 'CHF'];
+
+    // Fallback rates to USD (approximate, for currencies not in Frankfurter)
+    const FALLBACK_USD_RATES = {
+        USD: 1,
+        SAR: 3.75,
+        PKR: 278,
+        INR: 83,
+        CNY: 7.24,
+        AED: 3.67,
+        QAR: 3.64,
+        BHD: 0.376,
+        OMR: 0.385
+    };
 
     try {
-        // Frankfurter API - free historical exchange rates
-        const response = await fetch(apiUrl);
+        // Always fetch from USD as base since it's universally supported
+        const frankfurterCurrencies = CURRENCIES.filter(c =>
+            c !== 'USD' && FRANKFURTER_SUPPORTED.includes(c)
+        );
 
-        if (!response.ok) {
-            throw new Error('Exchange rate API error');
+        let apiRates = { USD: 1 };
+
+        if (frankfurterCurrencies.length > 0) {
+            const apiUrl = `https://api.frankfurter.app/${dateStr}?from=USD&to=${frankfurterCurrencies.join(',')}`;
+            const response = await fetch(apiUrl);
+
+            if (response.ok) {
+                const data = await response.json();
+                apiRates = { USD: 1, ...data.rates };
+
+                state.sources.exchangeRates = {
+                    url: apiUrl,
+                    displayUrl: `https://www.frankfurter.app/${dateStr}?from=USD`,
+                    isFallback: false
+                };
+            }
         }
 
-        const data = await response.json();
+        // Build complete USD-based rates (API + fallbacks for unsupported)
+        const usdBasedRates = {};
+        for (const currency of CURRENCIES) {
+            if (apiRates[currency] !== undefined) {
+                usdBasedRates[currency] = apiRates[currency];
+            } else {
+                usdBasedRates[currency] = FALLBACK_USD_RATES[currency] || 1;
+            }
+        }
 
-        // Store rates (how many units of currency per 1 base currency)
-        // Base currency always has rate of 1
-        state.exchangeRates = { [baseCurrency]: 1, ...data.rates };
-        state.sources.exchangeRates = {
-            url: apiUrl,
-            displayUrl: `https://www.frankfurter.app/${dateStr}?from=${baseCurrency}`,
-            isFallback: false
-        };
+        // Now convert to selected base currency
+        const baseToUsdRate = usdBasedRates[baseCurrency] || 1;
+        state.exchangeRates = {};
+        for (const [currency, usdRate] of Object.entries(usdBasedRates)) {
+            // Convert: how many units of 'currency' per 1 unit of 'baseCurrency'
+            state.exchangeRates[currency] = usdRate / baseToUsdRate;
+        }
+
+        // Mark as partial fallback if we used any fallback rates
+        const usedFallback = CURRENCIES.some(c =>
+            !FRANKFURTER_SUPPORTED.includes(c) && c !== 'USD'
+        );
+        if (usedFallback && state.sources.exchangeRates.url) {
+            state.sources.exchangeRates.isFallback = 'partial';
+        }
 
         console.log(`Exchange rates fetched (base: ${baseCurrency}):`, state.exchangeRates);
+
     } catch (error) {
         console.error('Error fetching exchange rates:', error);
-        // Fallback to approximate rates (relative to USD, then convert)
-        const usdRates = {
-            USD: 1,
-            SAR: 3.75,
-            PKR: 280,
-            INR: 83,
-            CNY: 7.2,
-            AED: 3.67,
-            QAR: 3.64,
-            BHD: 0.376,
-            OMR: 0.385
-        };
 
-        // Convert to base currency rates
-        const baseToUsd = usdRates[baseCurrency] || 1;
+        // Full fallback - convert all rates to base currency
+        const baseToUsd = FALLBACK_USD_RATES[baseCurrency] || 1;
         state.exchangeRates = {};
-        for (const [currency, usdRate] of Object.entries(usdRates)) {
+        for (const [currency, usdRate] of Object.entries(FALLBACK_USD_RATES)) {
             state.exchangeRates[currency] = usdRate / baseToUsd;
         }
 
@@ -639,9 +673,13 @@ function updateRatesDisplaySection() {
     const exchangeRatesLink = document.getElementById('exchange-rates-link');
     const exchangeRatesTable = document.getElementById('exchange-rates-table').querySelector('tbody');
 
-    if (state.sources.exchangeRates.isFallback) {
+    if (state.sources.exchangeRates.isFallback === true) {
         exchangeRatesLink.textContent = 'Fallback rates (API unavailable)';
         exchangeRatesLink.removeAttribute('href');
+        exchangeRatesLink.style.color = '#856404';
+    } else if (state.sources.exchangeRates.isFallback === 'partial') {
+        exchangeRatesLink.textContent = 'Frankfurter API + fallbacks';
+        exchangeRatesLink.href = state.sources.exchangeRates.displayUrl;
         exchangeRatesLink.style.color = '#856404';
     } else {
         exchangeRatesLink.textContent = 'Frankfurter API';
@@ -649,13 +687,24 @@ function updateRatesDisplaySection() {
         exchangeRatesLink.style.color = '';
     }
 
+    // Currencies that Frankfurter API supports
+    const FRANKFURTER_SUPPORTED = ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'INR', 'AUD', 'CAD', 'CHF'];
+
     // Populate exchange rates table
     exchangeRatesTable.innerHTML = '';
     CURRENCIES.forEach(currency => {
         if (state.exchangeRates[currency] !== undefined) {
             const row = document.createElement('tr');
             const rateValue = currency === base ? '1.0000 (base)' : state.exchangeRates[currency].toFixed(4);
-            const fallbackBadge = state.sources.exchangeRates.isFallback ? '<span class="fallback-warning">fallback</span>' : '';
+
+            // Show fallback badge for currencies not supported by API
+            let fallbackBadge = '';
+            if (state.sources.exchangeRates.isFallback === true) {
+                fallbackBadge = '<span class="fallback-warning">fallback</span>';
+            } else if (state.sources.exchangeRates.isFallback === 'partial' && !FRANKFURTER_SUPPORTED.includes(currency)) {
+                fallbackBadge = '<span class="fallback-warning">fallback</span>';
+            }
+
             row.innerHTML = `<td>${currency}</td><td>${rateValue} ${fallbackBadge}</td>`;
             exchangeRatesTable.appendChild(row);
         }
