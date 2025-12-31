@@ -152,43 +152,59 @@ async function fetchExchangeRates(dateStr) {
     }
 }
 
-// Fetch precious metal prices
+// Fetch precious metal prices from FreeGoldAPI.com (free, no API key required)
 async function fetchMetalPrices(dateStr) {
-    const apiUrl = 'https://api.metals.live/v1/spot';
+    const goldApiUrl = 'https://freegoldapi.com/data/latest.csv';
+    const ratioApiUrl = 'https://freegoldapi.com/data/gold_silver_ratio_enriched.csv';
 
     try {
-        // Try metals.live API first (free, no key)
-        const response = await fetch(apiUrl);
+        // Fetch both gold prices and gold/silver ratio in parallel
+        const [goldResponse, ratioResponse] = await Promise.all([
+            fetch(goldApiUrl),
+            fetch(ratioApiUrl)
+        ]);
 
-        if (response.ok) {
-            const data = await response.json();
-            // metals.live returns prices per troy ounce
-            const goldData = data.find(m => m.metal === 'gold');
-            const silverData = data.find(m => m.metal === 'silver');
+        if (!goldResponse.ok || !ratioResponse.ok) {
+            throw new Error('FreeGoldAPI request failed');
+        }
 
-            if (goldData && silverData) {
-                // Convert from per troy ounce to per gram
-                state.metalPrices.gold = goldData.price / TROY_OUNCE_TO_GRAMS;
-                state.metalPrices.silver = silverData.price / TROY_OUNCE_TO_GRAMS;
-                state.metalPrices.goldPerOz = goldData.price;
-                state.metalPrices.silverPerOz = silverData.price;
-                state.sources.metalPrices = {
-                    url: apiUrl,
-                    displayUrl: 'https://metals.live/',
-                    isFallback: false
-                };
-                console.log('Metal prices fetched from metals.live:', state.metalPrices);
-                return;
+        const goldCsv = await goldResponse.text();
+        const ratioCsv = await ratioResponse.text();
+
+        // Parse CSV data to find price for the selected date
+        const goldPrice = findPriceForDate(goldCsv, dateStr);
+        const ratioData = findRatioForDate(ratioCsv, dateStr);
+
+        if (goldPrice !== null) {
+            state.metalPrices.goldPerOz = goldPrice;
+            state.metalPrices.gold = goldPrice / TROY_OUNCE_TO_GRAMS;
+
+            // Calculate silver price from gold/silver ratio
+            if (ratioData && ratioData.ratio) {
+                state.metalPrices.silverPerOz = goldPrice / ratioData.ratio;
+                state.metalPrices.silver = state.metalPrices.silverPerOz / TROY_OUNCE_TO_GRAMS;
+            } else {
+                // Fallback ratio if not available (historical average ~60:1)
+                state.metalPrices.silverPerOz = goldPrice / 60;
+                state.metalPrices.silver = state.metalPrices.silverPerOz / TROY_OUNCE_TO_GRAMS;
             }
+
+            state.sources.metalPrices = {
+                url: goldApiUrl,
+                displayUrl: 'https://freegoldapi.com/',
+                isFallback: false,
+                dataDate: goldPrice.date || dateStr
+            };
+
+            console.log('Metal prices fetched from FreeGoldAPI:', state.metalPrices);
+            return;
         }
     } catch (error) {
-        console.error('metals.live API error:', error);
+        console.error('FreeGoldAPI error:', error);
     }
 
     // Fallback: use estimated prices
     console.log('Using fallback metal prices');
-    // Gold: ~$2000/oz = ~$64.30/gram
-    // Silver: ~$25/oz = ~$0.80/gram
     state.metalPrices.gold = 64.30;
     state.metalPrices.silver = 0.80;
     state.metalPrices.goldPerOz = 2000;
@@ -198,6 +214,91 @@ async function fetchMetalPrices(dateStr) {
         displayUrl: null,
         isFallback: true
     };
+}
+
+// Parse CSV and find gold price for a specific date (or closest earlier date)
+function findPriceForDate(csvText, targetDate) {
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) return null;
+
+    // Parse header to find column indices
+    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const dateIdx = header.findIndex(h => h === 'date');
+    const priceIdx = header.findIndex(h => h === 'price');
+
+    if (dateIdx === -1 || priceIdx === -1) return null;
+
+    // Parse data rows and find the best match
+    let bestMatch = null;
+    const targetDateObj = new Date(targetDate);
+
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        if (cols.length <= Math.max(dateIdx, priceIdx)) continue;
+
+        const rowDate = cols[dateIdx].trim();
+        const price = parseFloat(cols[priceIdx]);
+
+        if (isNaN(price)) continue;
+
+        const rowDateObj = new Date(rowDate);
+
+        // Exact match
+        if (rowDate === targetDate) {
+            return price;
+        }
+
+        // Track closest earlier date
+        if (rowDateObj <= targetDateObj) {
+            if (!bestMatch || rowDateObj > new Date(bestMatch.date)) {
+                bestMatch = { date: rowDate, price: price };
+            }
+        }
+    }
+
+    return bestMatch ? bestMatch.price : null;
+}
+
+// Parse CSV and find gold/silver ratio for a specific date
+function findRatioForDate(csvText, targetDate) {
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) return null;
+
+    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const dateIdx = header.findIndex(h => h === 'date');
+    // Look for ratio column (might be named differently)
+    const ratioIdx = header.findIndex(h =>
+        h.includes('ratio') || h.includes('silver_oz_per_gold')
+    );
+
+    if (dateIdx === -1 || ratioIdx === -1) return null;
+
+    let bestMatch = null;
+    const targetDateObj = new Date(targetDate);
+
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        if (cols.length <= Math.max(dateIdx, ratioIdx)) continue;
+
+        const rowDate = cols[dateIdx].trim();
+        const ratio = parseFloat(cols[ratioIdx]);
+
+        if (isNaN(ratio)) continue;
+
+        const rowDateObj = new Date(rowDate);
+
+        if (rowDate === targetDate) {
+            return { date: rowDate, ratio: ratio };
+        }
+
+        if (rowDateObj <= targetDateObj) {
+            if (!bestMatch || rowDateObj > new Date(bestMatch.date)) {
+                bestMatch = { date: rowDate, ratio: ratio };
+            }
+        }
+    }
+
+    return bestMatch;
 }
 
 // Fetch stock price for a specific symbol
@@ -423,7 +524,7 @@ function updateRatesDisplaySection() {
         metalPricesLink.removeAttribute('href');
         metalPricesLink.style.color = '#856404';
     } else {
-        metalPricesLink.textContent = 'Metals.live';
+        metalPricesLink.textContent = 'FreeGoldAPI.com';
         metalPricesLink.href = state.sources.metalPrices.displayUrl;
         metalPricesLink.style.color = '';
     }
