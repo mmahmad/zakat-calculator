@@ -122,13 +122,15 @@ function updateMetalPricesInBase() {
     if (state.baseCurrency === 'USD') {
         state.metalPricesInBase = { ...state.metalPrices };
     } else {
-        // Get USD rate in terms of base currency
+        // state.exchangeRates['USD'] = how many USD per 1 base currency
+        // To convert USD to base: divide by this rate (or multiply by its inverse)
         const usdRate = state.exchangeRates['USD'] || 1;
+        const usdToBaseMultiplier = 1 / usdRate;
         state.metalPricesInBase = {
-            gold: state.metalPrices.gold ? state.metalPrices.gold * usdRate : null,
-            silver: state.metalPrices.silver ? state.metalPrices.silver * usdRate : null,
-            goldPerOz: state.metalPrices.goldPerOz ? state.metalPrices.goldPerOz * usdRate : null,
-            silverPerOz: state.metalPrices.silverPerOz ? state.metalPrices.silverPerOz * usdRate : null
+            gold: state.metalPrices.gold ? state.metalPrices.gold * usdToBaseMultiplier : null,
+            silver: state.metalPrices.silver ? state.metalPrices.silver * usdToBaseMultiplier : null,
+            goldPerOz: state.metalPrices.goldPerOz ? state.metalPrices.goldPerOz * usdToBaseMultiplier : null,
+            silverPerOz: state.metalPrices.silverPerOz ? state.metalPrices.silverPerOz * usdToBaseMultiplier : null
         };
     }
 }
@@ -835,9 +837,11 @@ function updateStocksTotal() {
     });
 
     // Convert USD to base currency
+    // state.exchangeRates['USD'] = how many USD per 1 base currency
+    // To convert USD to base: divide by this rate
     let totalBase = totalUSD;
     if (base !== 'USD' && state.exchangeRates['USD']) {
-        totalBase = totalUSD * state.exchangeRates['USD'];
+        totalBase = totalUSD / state.exchangeRates['USD'];
     }
 
     elements.stocksTotal.textContent = `${symbol}${totalBase.toFixed(2)}`;
