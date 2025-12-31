@@ -179,13 +179,18 @@
             <!-- Stocks Section -->
             <section class="asset-section">
                 <h2>📈 US Stocks</h2>
-                <p class="section-desc">Enter stock symbols, look up prices, and enter closing price for your date</p>
+                <p class="section-desc">Enter stock symbols and shares. Use "Fetch Prices" if server is running, or look up manually.</p>
+                <div class="stock-server-status">
+                    <span id="server-status" class="server-status offline">Server: Checking...</span>
+                    <button id="fetch-all-stocks-btn" class="btn btn-small btn-fetch" disabled>Fetch Prices</button>
+                    <span class="server-hint">Run <code>python server.py</code> to enable auto-fetch</span>
+                </div>
                 <div id="stocks-container">
                     <div class="stock-row">
                         <input type="text" class="stock-symbol" placeholder="Symbol (e.g., AAPL)" maxlength="10">
                         <input type="number" class="stock-shares" step="0.0001" min="0" placeholder="Shares">
                         <input type="number" class="stock-price-input" step="0.01" min="0" placeholder="Price ($)">
-                        <a class="btn btn-small btn-fetch stock-lookup" href="#" target="_blank" rel="noopener">Look up</a>
+                        <a class="btn btn-small btn-secondary stock-lookup" href="#" target="_blank" rel="noopener">Look up</a>
                         <span class="stock-value">Value: --</span>
                         <button class="btn btn-small btn-danger" onclick="removeStockRow(this)">×</button>
                     </div>

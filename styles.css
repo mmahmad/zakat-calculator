@@ -233,6 +233,52 @@ header .subtitle {
     font-size: 1.1rem;
 }
 
+/* Stock Server Status */
+.stock-server-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.server-status {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.server-status.online {
+    background: #d4edda;
+    color: #155724;
+}
+
+.server-status.offline {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.server-status.checking {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.server-hint {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.server-hint code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
 /* Stock Rows */
 .stock-row {
     display: grid;

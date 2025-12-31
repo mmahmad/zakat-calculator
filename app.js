@@ -10,6 +10,7 @@ const state = {
     },
     stockPrices: {},        // Symbol -> price
     ratesFetched: false,
+    stockServerOnline: false,
     // Source tracking for transparency
     sources: {
         exchangeRates: { url: null, isFallback: false },
@@ -20,6 +21,7 @@ const state = {
 // Constants
 const ZAKAT_RATE = 0.025;   // 2.5%
 const TROY_OUNCE_TO_GRAMS = 31.1035;
+const STOCK_SERVER_URL = 'http://localhost:5555';
 
 // Currency codes we support
 const CURRENCIES = ['USD', 'SAR', 'PKR', 'INR', 'CNY', 'AED', 'QAR', 'BHD', 'OMR'];
@@ -301,6 +303,122 @@ function findRatioForDate(csvText, targetDate) {
     return bestMatch;
 }
 
+// Check if stock server is running
+async function checkStockServer() {
+    const statusEl = document.getElementById('server-status');
+    const fetchBtn = document.getElementById('fetch-all-stocks-btn');
+
+    statusEl.textContent = 'Server: Checking...';
+    statusEl.className = 'server-status checking';
+
+    try {
+        const response = await fetch(`${STOCK_SERVER_URL}/health`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(2000) // 2 second timeout
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'ok') {
+                state.stockServerOnline = true;
+                statusEl.textContent = 'Server: Online';
+                statusEl.className = 'server-status online';
+                fetchBtn.disabled = false;
+                return true;
+            }
+        }
+    } catch (error) {
+        // Server not available
+    }
+
+    state.stockServerOnline = false;
+    statusEl.textContent = 'Server: Offline';
+    statusEl.className = 'server-status offline';
+    fetchBtn.disabled = true;
+    return false;
+}
+
+// Fetch all stock prices from the server
+async function fetchAllStockPrices() {
+    if (!state.stockServerOnline) {
+        alert('Stock server is not running. Please start it with: python server.py');
+        return;
+    }
+
+    if (!state.calculationDate) {
+        alert('Please select a calculation date first.');
+        return;
+    }
+
+    // Collect all symbols from stock rows
+    const symbols = [];
+    document.querySelectorAll('.stock-row').forEach(row => {
+        const symbol = row.querySelector('.stock-symbol').value.trim().toUpperCase();
+        if (symbol) {
+            symbols.push(symbol);
+        }
+    });
+
+    if (symbols.length === 0) {
+        alert('Please enter at least one stock symbol.');
+        return;
+    }
+
+    const fetchBtn = document.getElementById('fetch-all-stocks-btn');
+    const originalText = fetchBtn.textContent;
+    fetchBtn.textContent = 'Fetching...';
+    fetchBtn.disabled = true;
+
+    try {
+        const response = await fetch(
+            `${STOCK_SERVER_URL}/stocks?symbols=${symbols.join(',')}&date=${state.calculationDate}`
+        );
+
+        if (!response.ok) {
+            throw new Error('Server request failed');
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Update each stock row with the fetched price
+        let fetchedCount = 0;
+        document.querySelectorAll('.stock-row').forEach(row => {
+            const symbolInput = row.querySelector('.stock-symbol');
+            const priceInput = row.querySelector('.stock-price-input');
+            const symbol = symbolInput.value.trim().toUpperCase();
+
+            if (symbol && data.prices[symbol]) {
+                const priceData = data.prices[symbol];
+                if (priceData.price !== null) {
+                    priceInput.value = priceData.price;
+                    // Trigger input event to update value calculation
+                    priceInput.dispatchEvent(new Event('input'));
+                    fetchedCount++;
+                } else if (priceData.error) {
+                    console.warn(`Error fetching ${symbol}: ${priceData.error}`);
+                }
+            }
+        });
+
+        if (fetchedCount > 0) {
+            alert(`Successfully fetched prices for ${fetchedCount} stock(s).`);
+        } else {
+            alert('Could not fetch any stock prices. Check the symbols and try again.');
+        }
+
+    } catch (error) {
+        console.error('Error fetching stock prices:', error);
+        alert(`Error fetching stock prices: ${error.message}\n\nYou can still enter prices manually.`);
+    } finally {
+        fetchBtn.textContent = originalText;
+        fetchBtn.disabled = !state.stockServerOnline;
+    }
+}
+
 // Set up stock row event listeners
 function setupStockRowListeners(row) {
     const symbolInput = row.querySelector('.stock-symbol');
@@ -346,11 +464,24 @@ function setupStockRowListeners(row) {
     priceInput.addEventListener('input', updateValue);
 }
 
-// Initialize existing stock rows
+// Initialize existing stock rows and check server
 document.addEventListener('DOMContentLoaded', () => {
+    // Set up stock row listeners
     document.querySelectorAll('.stock-row').forEach(row => {
         setupStockRowListeners(row);
     });
+
+    // Check if stock server is running
+    checkStockServer();
+
+    // Set up fetch all stocks button
+    const fetchAllBtn = document.getElementById('fetch-all-stocks-btn');
+    if (fetchAllBtn) {
+        fetchAllBtn.addEventListener('click', fetchAllStockPrices);
+    }
+
+    // Periodically check server status (every 30 seconds)
+    setInterval(checkStockServer, 30000);
 });
 
 // Add a new stock row
