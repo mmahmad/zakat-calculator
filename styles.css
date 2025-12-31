@@ -367,6 +367,114 @@ footer .disclaimer {
     opacity: 0.7;
 }
 
+/* Rates Display Section */
+.rates-display-section {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.rates-display-section h2 {
+    color: #1a5a3c;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.rates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.rates-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+}
+
+.rates-card h3 {
+    color: #495057;
+    font-size: 1rem;
+    margin-bottom: 8px;
+}
+
+.source-link {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.source-link a {
+    color: #17a2b8;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.source-link a:hover {
+    text-decoration: underline;
+    color: #138496;
+}
+
+.rates-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.rates-table th {
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 2px solid #dee2e6;
+    color: #495057;
+    font-weight: 600;
+}
+
+.rates-table td {
+    padding: 6px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.rates-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.rates-table tbody tr:hover {
+    background: #e9ecef;
+}
+
+.rates-table .empty-message {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 15px;
+}
+
+.rates-table a {
+    color: #17a2b8;
+    text-decoration: none;
+    font-size: 0.85rem;
+}
+
+.rates-table a:hover {
+    text-decoration: underline;
+}
+
+.fallback-warning {
+    background: #fff3cd;
+    color: #856404;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 5px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {

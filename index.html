@@ -20,6 +20,58 @@
             <div id="rates-status" class="status"></div>
         </section>
 
+        <!-- Fetched Rates Display -->
+        <section id="fetched-rates-section" class="rates-display-section" style="display: none;">
+            <h2>Fetched Rates</h2>
+            <p class="section-desc">Rates retrieved for <span id="rates-date">--</span>. Click links to verify.</p>
+
+            <div class="rates-grid">
+                <!-- Exchange Rates -->
+                <div class="rates-card">
+                    <h3>Exchange Rates (per 1 USD)</h3>
+                    <div class="source-link">
+                        Source: <a id="exchange-rates-link" href="#" target="_blank" rel="noopener">Frankfurter API</a>
+                    </div>
+                    <table class="rates-table" id="exchange-rates-table">
+                        <thead>
+                            <tr><th>Currency</th><th>Rate</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <!-- Metal Prices -->
+                <div class="rates-card">
+                    <h3>Precious Metal Prices (per gram)</h3>
+                    <div class="source-link">
+                        Source: <a id="metal-prices-link" href="#" target="_blank" rel="noopener">Metals.live</a>
+                    </div>
+                    <table class="rates-table" id="metal-prices-table">
+                        <thead>
+                            <tr><th>Metal</th><th>Price (USD)</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <!-- Stock Prices -->
+                <div class="rates-card">
+                    <h3>Stock Prices</h3>
+                    <div class="source-link">
+                        Source: <a href="https://finance.yahoo.com/" target="_blank" rel="noopener">Yahoo Finance</a>
+                    </div>
+                    <table class="rates-table" id="stock-prices-table">
+                        <thead>
+                            <tr><th>Symbol</th><th>Price (USD)</th><th>Verify</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="3" class="empty-message">No stocks fetched yet</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <main class="calculator-sections">
             <!-- Cash Section -->
             <section class="asset-section">

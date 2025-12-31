@@ -9,7 +9,12 @@ const state = {
         silver: null
     },
     stockPrices: {},        // Symbol -> price
-    ratesFetched: false
+    ratesFetched: false,
+    // Source tracking for transparency
+    sources: {
+        exchangeRates: { url: null, isFallback: false },
+        metalPrices: { url: null, isFallback: false }
+    }
 };
 
 // Constants
@@ -102,12 +107,12 @@ async function fetchAllRates() {
 
 // Fetch exchange rates using Frankfurter API (free, no key required)
 async function fetchExchangeRates(dateStr) {
+    const currencies = CURRENCIES.filter(c => c !== 'USD').join(',');
+    const apiUrl = `https://api.frankfurter.app/${dateStr}?from=USD&to=${currencies}`;
+
     try {
         // Frankfurter API - free historical exchange rates
-        const currencies = CURRENCIES.filter(c => c !== 'USD').join(',');
-        const response = await fetch(
-            `https://api.frankfurter.app/${dateStr}?from=USD&to=${currencies}`
-        );
+        const response = await fetch(apiUrl);
 
         if (!response.ok) {
             throw new Error('Exchange rate API error');
@@ -117,6 +122,11 @@ async function fetchExchangeRates(dateStr) {
 
         // Store rates (how many units of currency per 1 USD)
         state.exchangeRates = { USD: 1, ...data.rates };
+        state.sources.exchangeRates = {
+            url: apiUrl,
+            displayUrl: `https://www.frankfurter.app/${dateStr}?from=USD`,
+            isFallback: false
+        };
 
         console.log('Exchange rates fetched:', state.exchangeRates);
     } catch (error) {
@@ -133,15 +143,22 @@ async function fetchExchangeRates(dateStr) {
             BHD: 0.376,
             OMR: 0.385
         };
+        state.sources.exchangeRates = {
+            url: null,
+            displayUrl: null,
+            isFallback: true
+        };
         console.log('Using fallback exchange rates');
     }
 }
 
 // Fetch precious metal prices
 async function fetchMetalPrices(dateStr) {
+    const apiUrl = 'https://api.metals.live/v1/spot';
+
     try {
         // Try metals.live API first (free, no key)
-        const response = await fetch('https://api.metals.live/v1/spot');
+        const response = await fetch(apiUrl);
 
         if (response.ok) {
             const data = await response.json();
@@ -153,6 +170,13 @@ async function fetchMetalPrices(dateStr) {
                 // Convert from per troy ounce to per gram
                 state.metalPrices.gold = goldData.price / TROY_OUNCE_TO_GRAMS;
                 state.metalPrices.silver = silverData.price / TROY_OUNCE_TO_GRAMS;
+                state.metalPrices.goldPerOz = goldData.price;
+                state.metalPrices.silverPerOz = silverData.price;
+                state.sources.metalPrices = {
+                    url: apiUrl,
+                    displayUrl: 'https://metals.live/',
+                    isFallback: false
+                };
                 console.log('Metal prices fetched from metals.live:', state.metalPrices);
                 return;
             }
@@ -161,27 +185,19 @@ async function fetchMetalPrices(dateStr) {
         console.error('metals.live API error:', error);
     }
 
-    // Fallback: try goldapi.io or use estimated prices
-    try {
-        // Alternative: use a CORS proxy with another API
-        // For now, use reasonable fallback prices
-        await fetchMetalPricesFallback();
-    } catch (error) {
-        console.error('Fallback metal prices error:', error);
-        // Last resort fallback (approximate prices)
-        state.metalPrices.gold = 65;    // ~$65 per gram
-        state.metalPrices.silver = 0.85; // ~$0.85 per gram
-        console.log('Using fallback metal prices');
-    }
-}
-
-// Fallback metal prices fetcher
-async function fetchMetalPricesFallback() {
-    // Try to get from alternative source or use recent estimates
+    // Fallback: use estimated prices
+    console.log('Using fallback metal prices');
     // Gold: ~$2000/oz = ~$64.30/gram
     // Silver: ~$25/oz = ~$0.80/gram
     state.metalPrices.gold = 64.30;
     state.metalPrices.silver = 0.80;
+    state.metalPrices.goldPerOz = 2000;
+    state.metalPrices.silverPerOz = 25;
+    state.sources.metalPrices = {
+        url: null,
+        displayUrl: null,
+        isFallback: true
+    };
 }
 
 // Fetch stock price for a specific symbol
@@ -214,6 +230,7 @@ async function fetchStockPrice(button) {
             }
 
             updateStocksTotal();
+            updateStockPricesTable(); // Update the rates display table
         } else {
             priceSpan.textContent = 'Not found';
         }
@@ -323,7 +340,7 @@ function updateStockRowValue(row) {
 
 // Update all rate displays
 function updateAllDisplays() {
-    // Update currency rate displays
+    // Update currency rate displays in input section
     CURRENCIES.forEach(currency => {
         const rateSpan = document.querySelector(`[data-rate-for="${currency}"]`);
         if (rateSpan && state.exchangeRates[currency]) {
@@ -335,7 +352,7 @@ function updateAllDisplays() {
         }
     });
 
-    // Update metal price displays
+    // Update metal price displays in input section
     if (state.metalPrices.gold) {
         const goldPrice = state.metalPrices.gold;
         document.querySelector('[data-rate-for="gold-24k"]').textContent =
@@ -355,9 +372,103 @@ function updateAllDisplays() {
             `$${state.metalPrices.silver.toFixed(2)}/g`;
     }
 
+    // Update the fetched rates display section
+    updateRatesDisplaySection();
+
     updateCashTotal();
     updateMetalsTotal();
     updateStocksTotal();
+}
+
+// Update the rates display section with source links
+function updateRatesDisplaySection() {
+    const section = document.getElementById('fetched-rates-section');
+    section.style.display = 'block';
+
+    // Update date display
+    document.getElementById('rates-date').textContent = state.calculationDate;
+
+    // Update exchange rates table
+    const exchangeRatesLink = document.getElementById('exchange-rates-link');
+    const exchangeRatesTable = document.getElementById('exchange-rates-table').querySelector('tbody');
+
+    if (state.sources.exchangeRates.isFallback) {
+        exchangeRatesLink.textContent = 'Fallback rates (API unavailable)';
+        exchangeRatesLink.removeAttribute('href');
+        exchangeRatesLink.style.color = '#856404';
+    } else {
+        exchangeRatesLink.textContent = 'Frankfurter API';
+        exchangeRatesLink.href = state.sources.exchangeRates.displayUrl;
+        exchangeRatesLink.style.color = '';
+    }
+
+    // Populate exchange rates table
+    exchangeRatesTable.innerHTML = '';
+    CURRENCIES.forEach(currency => {
+        if (state.exchangeRates[currency]) {
+            const row = document.createElement('tr');
+            const rateValue = currency === 'USD' ? '1.0000 (base)' : state.exchangeRates[currency].toFixed(4);
+            const fallbackBadge = state.sources.exchangeRates.isFallback ? '<span class="fallback-warning">fallback</span>' : '';
+            row.innerHTML = `<td>${currency}</td><td>${rateValue} ${fallbackBadge}</td>`;
+            exchangeRatesTable.appendChild(row);
+        }
+    });
+
+    // Update metal prices table
+    const metalPricesLink = document.getElementById('metal-prices-link');
+    const metalPricesTable = document.getElementById('metal-prices-table').querySelector('tbody');
+
+    if (state.sources.metalPrices.isFallback) {
+        metalPricesLink.textContent = 'Fallback prices (API unavailable)';
+        metalPricesLink.removeAttribute('href');
+        metalPricesLink.style.color = '#856404';
+    } else {
+        metalPricesLink.textContent = 'Metals.live';
+        metalPricesLink.href = state.sources.metalPrices.displayUrl;
+        metalPricesLink.style.color = '';
+    }
+
+    // Populate metal prices table
+    metalPricesTable.innerHTML = '';
+    const fallbackBadge = state.sources.metalPrices.isFallback ? '<span class="fallback-warning">fallback</span>' : '';
+
+    if (state.metalPrices.gold) {
+        const goldRow = document.createElement('tr');
+        goldRow.innerHTML = `<td>Gold (per oz / per gram)</td><td>$${state.metalPrices.goldPerOz.toFixed(2)}/oz = $${state.metalPrices.gold.toFixed(2)}/g ${fallbackBadge}</td>`;
+        metalPricesTable.appendChild(goldRow);
+    }
+    if (state.metalPrices.silver) {
+        const silverRow = document.createElement('tr');
+        silverRow.innerHTML = `<td>Silver (per oz / per gram)</td><td>$${state.metalPrices.silverPerOz.toFixed(2)}/oz = $${state.metalPrices.silver.toFixed(2)}/g ${fallbackBadge}</td>`;
+        metalPricesTable.appendChild(silverRow);
+    }
+
+    // Update stock prices table
+    updateStockPricesTable();
+}
+
+// Update the stock prices display table
+function updateStockPricesTable() {
+    const stockPricesTable = document.getElementById('stock-prices-table').querySelector('tbody');
+    const symbols = Object.keys(state.stockPrices);
+
+    if (symbols.length === 0) {
+        stockPricesTable.innerHTML = '<tr><td colspan="3" class="empty-message">No stocks fetched yet</td></tr>';
+        return;
+    }
+
+    stockPricesTable.innerHTML = '';
+    symbols.forEach(symbol => {
+        const price = state.stockPrices[symbol];
+        const yahooUrl = `https://finance.yahoo.com/quote/${symbol}`;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${symbol}</strong></td>
+            <td>$${price.toFixed(2)}</td>
+            <td><a href="${yahooUrl}" target="_blank" rel="noopener">Yahoo Finance</a></td>
+        `;
+        stockPricesTable.appendChild(row);
+    });
 }
 
 // Calculate cash total in USD
