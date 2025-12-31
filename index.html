@@ -38,8 +38,24 @@
         </section>
 
         <section class="date-section">
-            <label for="calculation-date">Calculation Date:</label>
-            <input type="date" id="calculation-date" required>
+            <div class="date-input-group">
+                <label for="calculation-date">Calculation Date:</label>
+                <input type="date" id="calculation-date" required>
+            </div>
+            <div class="currency-input-group">
+                <label for="base-currency">Base Currency:</label>
+                <select id="base-currency">
+                    <option value="USD">USD (US Dollar)</option>
+                    <option value="SAR">SAR (Saudi Riyal)</option>
+                    <option value="PKR">PKR (Pakistani Rupee)</option>
+                    <option value="INR">INR (Indian Rupee)</option>
+                    <option value="CNY">CNY (Chinese Yuan)</option>
+                    <option value="AED">AED (UAE Dirham)</option>
+                    <option value="QAR">QAR (Qatari Riyal)</option>
+                    <option value="BHD">BHD (Bahraini Dinar)</option>
+                    <option value="OMR">OMR (Omani Rial)</option>
+                </select>
+            </div>
             <button id="fetch-rates-btn" class="btn btn-primary">Fetch Rates for Date</button>
             <div id="rates-status" class="status"></div>
         </section>
@@ -52,7 +68,7 @@
             <div class="rates-grid">
                 <!-- Exchange Rates -->
                 <div class="rates-card">
-                    <h3>Exchange Rates (per 1 USD)</h3>
+                    <h3>Exchange Rates (per 1 <span id="base-currency-label">USD</span>)</h3>
                     <div class="source-link">
                         Source: <a id="exchange-rates-link" href="#" target="_blank" rel="noopener">Frankfurter API</a>
                     </div>
@@ -149,7 +165,7 @@
                     </div>
                 </div>
                 <div class="section-total">
-                    Cash Total (USD): <span id="cash-total">$0.00</span>
+                    Cash Total: <span id="cash-total">$0.00</span>
                 </div>
             </section>
 
@@ -196,14 +212,14 @@
                     </div>
                 </div>
                 <div class="section-total">
-                    Metals Total (USD): <span id="metals-total">$0.00</span>
+                    Metals Total: <span id="metals-total">$0.00</span>
                 </div>
             </section>
 
             <!-- Stocks Section -->
             <section class="asset-section">
                 <h2>📈 US Stocks</h2>
-                <p class="section-desc">Enter stock symbols and shares. Use "Fetch Prices" if server is running, or look up manually.</p>
+                <p class="section-desc">Enter stock symbols and shares. Prices are in USD. Use "Fetch Prices" if server is running, or look up manually.</p>
                 <div class="stock-server-status">
                     <span id="server-status" class="server-status offline">Server: Checking...</span>
                     <button id="fetch-all-stocks-btn" class="btn btn-small btn-fetch" disabled>Fetch Prices</button>
@@ -221,7 +237,7 @@
                 </div>
                 <button id="add-stock-btn" class="btn btn-secondary">+ Add Stock</button>
                 <div class="section-total">
-                    Stocks Total (USD): <span id="stocks-total">$0.00</span>
+                    Stocks Total: <span id="stocks-total">$0.00</span>
                 </div>
             </section>
         </main>
@@ -247,7 +263,7 @@
                         <span id="result-stocks">$0.00</span>
                     </div>
                     <div class="breakdown-item total">
-                        <span>Total Wealth (USD):</span>
+                        <span>Total Wealth (<span id="result-base-currency">USD</span>):</span>
                         <span id="result-total">$0.00</span>
                     </div>
                 </div>

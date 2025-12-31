@@ -3,12 +3,17 @@
 // Global state
 const state = {
     calculationDate: null,
-    exchangeRates: {},      // Rates to USD
-    metalPrices: {          // Price per gram in USD
+    baseCurrency: 'USD',    // Selected base currency
+    exchangeRates: {},      // Rates from base currency
+    metalPrices: {          // Price per gram in USD (always USD for API)
         gold: null,
         silver: null
     },
-    stockPrices: {},        // Symbol -> price
+    metalPricesInBase: {    // Price per gram in base currency
+        gold: null,
+        silver: null
+    },
+    stockPrices: {},        // Symbol -> price in USD
     ratesFetched: false,
     stockServerOnline: false,
     // Source tracking for transparency
@@ -38,6 +43,7 @@ const GOLD_PURITIES = {
 // DOM Elements
 const elements = {
     calculationDate: document.getElementById('calculation-date'),
+    baseCurrency: document.getElementById('base-currency'),
     fetchRatesBtn: document.getElementById('fetch-rates-btn'),
     ratesStatus: document.getElementById('rates-status'),
     addStockBtn: document.getElementById('add-stock-btn'),
@@ -85,6 +91,7 @@ async function fetchAllRates() {
     }
 
     state.calculationDate = dateStr;
+    state.baseCurrency = elements.baseCurrency.value;
     state.ratesFetched = false;
     elements.fetchRatesBtn.disabled = true;
     setStatus('Fetching exchange rates and metal prices...', 'loading');
@@ -92,12 +99,15 @@ async function fetchAllRates() {
     try {
         // Fetch currency rates and metal prices in parallel
         await Promise.all([
-            fetchExchangeRates(dateStr),
+            fetchExchangeRates(dateStr, state.baseCurrency),
             fetchMetalPrices(dateStr)
         ]);
 
+        // Convert metal prices to base currency
+        updateMetalPricesInBase();
+
         state.ratesFetched = true;
-        setStatus(`Rates fetched for ${dateStr}`, 'success');
+        setStatus(`Rates fetched for ${dateStr} (Base: ${state.baseCurrency})`, 'success');
         updateAllDisplays();
     } catch (error) {
         console.error('Error fetching rates:', error);
@@ -107,10 +117,27 @@ async function fetchAllRates() {
     }
 }
 
+// Convert metal prices from USD to base currency
+function updateMetalPricesInBase() {
+    if (state.baseCurrency === 'USD') {
+        state.metalPricesInBase = { ...state.metalPrices };
+    } else {
+        // Get USD rate in terms of base currency
+        const usdRate = state.exchangeRates['USD'] || 1;
+        state.metalPricesInBase = {
+            gold: state.metalPrices.gold ? state.metalPrices.gold * usdRate : null,
+            silver: state.metalPrices.silver ? state.metalPrices.silver * usdRate : null,
+            goldPerOz: state.metalPrices.goldPerOz ? state.metalPrices.goldPerOz * usdRate : null,
+            silverPerOz: state.metalPrices.silverPerOz ? state.metalPrices.silverPerOz * usdRate : null
+        };
+    }
+}
+
 // Fetch exchange rates using Frankfurter API (free, no key required)
-async function fetchExchangeRates(dateStr) {
-    const currencies = CURRENCIES.filter(c => c !== 'USD').join(',');
-    const apiUrl = `https://api.frankfurter.app/${dateStr}?from=USD&to=${currencies}`;
+async function fetchExchangeRates(dateStr, baseCurrency = 'USD') {
+    // Get all other currencies except the base
+    const targetCurrencies = CURRENCIES.filter(c => c !== baseCurrency).join(',');
+    const apiUrl = `https://api.frankfurter.app/${dateStr}?from=${baseCurrency}&to=${targetCurrencies}`;
 
     try {
         // Frankfurter API - free historical exchange rates
@@ -122,19 +149,20 @@ async function fetchExchangeRates(dateStr) {
 
         const data = await response.json();
 
-        // Store rates (how many units of currency per 1 USD)
-        state.exchangeRates = { USD: 1, ...data.rates };
+        // Store rates (how many units of currency per 1 base currency)
+        // Base currency always has rate of 1
+        state.exchangeRates = { [baseCurrency]: 1, ...data.rates };
         state.sources.exchangeRates = {
             url: apiUrl,
-            displayUrl: `https://www.frankfurter.app/${dateStr}?from=USD`,
+            displayUrl: `https://www.frankfurter.app/${dateStr}?from=${baseCurrency}`,
             isFallback: false
         };
 
-        console.log('Exchange rates fetched:', state.exchangeRates);
+        console.log(`Exchange rates fetched (base: ${baseCurrency}):`, state.exchangeRates);
     } catch (error) {
         console.error('Error fetching exchange rates:', error);
-        // Fallback to approximate rates if API fails
-        state.exchangeRates = {
+        // Fallback to approximate rates (relative to USD, then convert)
+        const usdRates = {
             USD: 1,
             SAR: 3.75,
             PKR: 280,
@@ -145,6 +173,14 @@ async function fetchExchangeRates(dateStr) {
             BHD: 0.376,
             OMR: 0.385
         };
+
+        // Convert to base currency rates
+        const baseToUsd = usdRates[baseCurrency] || 1;
+        state.exchangeRates = {};
+        for (const [currency, usdRate] of Object.entries(usdRates)) {
+            state.exchangeRates[currency] = usdRate / baseToUsd;
+        }
+
         state.sources.exchangeRates = {
             url: null,
             displayUrl: null,
@@ -533,38 +569,50 @@ function removeStockRow(button) {
     }
 }
 
+// Get currency symbol for display
+function getCurrencySymbol(currency) {
+    const symbols = {
+        USD: '$', SAR: 'SAR ', PKR: 'Rs', INR: '₹',
+        CNY: '¥', AED: 'AED ', QAR: 'QAR ', BHD: 'BHD ', OMR: 'OMR '
+    };
+    return symbols[currency] || currency + ' ';
+}
+
 // Update all rate displays
 function updateAllDisplays() {
+    const base = state.baseCurrency;
+    const symbol = getCurrencySymbol(base);
+
     // Update currency rate displays in input section
     CURRENCIES.forEach(currency => {
         const rateSpan = document.querySelector(`[data-rate-for="${currency}"]`);
-        if (rateSpan && state.exchangeRates[currency]) {
-            if (currency === 'USD') {
+        if (rateSpan && state.exchangeRates[currency] !== undefined) {
+            if (currency === base) {
                 rateSpan.textContent = 'Base currency';
             } else {
-                rateSpan.textContent = `1 USD = ${state.exchangeRates[currency].toFixed(4)} ${currency}`;
+                rateSpan.textContent = `1 ${base} = ${state.exchangeRates[currency].toFixed(4)} ${currency}`;
             }
         }
     });
 
-    // Update metal price displays in input section
-    if (state.metalPrices.gold) {
-        const goldPrice = state.metalPrices.gold;
+    // Update metal price displays in input section (in base currency)
+    if (state.metalPricesInBase.gold) {
+        const goldPrice = state.metalPricesInBase.gold;
         document.querySelector('[data-rate-for="gold-24k"]').textContent =
-            `$${goldPrice.toFixed(2)}/g`;
+            `${symbol}${goldPrice.toFixed(2)}/g`;
         document.querySelector('[data-rate-for="gold-22k"]').textContent =
-            `$${(goldPrice * GOLD_PURITIES['22k']).toFixed(2)}/g`;
+            `${symbol}${(goldPrice * GOLD_PURITIES['22k']).toFixed(2)}/g`;
         document.querySelector('[data-rate-for="gold-18k"]').textContent =
-            `$${(goldPrice * GOLD_PURITIES['18k']).toFixed(2)}/g`;
+            `${symbol}${(goldPrice * GOLD_PURITIES['18k']).toFixed(2)}/g`;
         document.querySelector('[data-rate-for="gold-15k"]').textContent =
-            `$${(goldPrice * GOLD_PURITIES['15k']).toFixed(2)}/g`;
+            `${symbol}${(goldPrice * GOLD_PURITIES['15k']).toFixed(2)}/g`;
         document.querySelector('[data-rate-for="gold-10k"]').textContent =
-            `$${(goldPrice * GOLD_PURITIES['10k']).toFixed(2)}/g`;
+            `${symbol}${(goldPrice * GOLD_PURITIES['10k']).toFixed(2)}/g`;
     }
 
-    if (state.metalPrices.silver) {
+    if (state.metalPricesInBase.silver) {
         document.querySelector('[data-rate-for="silver"]').textContent =
-            `$${state.metalPrices.silver.toFixed(2)}/g`;
+            `${symbol}${state.metalPricesInBase.silver.toFixed(2)}/g`;
     }
 
     // Update the fetched rates display section
@@ -579,9 +627,13 @@ function updateAllDisplays() {
 function updateRatesDisplaySection() {
     const section = document.getElementById('fetched-rates-section');
     section.style.display = 'block';
+    const base = state.baseCurrency;
 
     // Update date display
     document.getElementById('rates-date').textContent = state.calculationDate;
+
+    // Update base currency label in header
+    document.getElementById('base-currency-label').textContent = base;
 
     // Update exchange rates table
     const exchangeRatesLink = document.getElementById('exchange-rates-link');
@@ -600,9 +652,9 @@ function updateRatesDisplaySection() {
     // Populate exchange rates table
     exchangeRatesTable.innerHTML = '';
     CURRENCIES.forEach(currency => {
-        if (state.exchangeRates[currency]) {
+        if (state.exchangeRates[currency] !== undefined) {
             const row = document.createElement('tr');
-            const rateValue = currency === 'USD' ? '1.0000 (base)' : state.exchangeRates[currency].toFixed(4);
+            const rateValue = currency === base ? '1.0000 (base)' : state.exchangeRates[currency].toFixed(4);
             const fallbackBadge = state.sources.exchangeRates.isFallback ? '<span class="fallback-warning">fallback</span>' : '';
             row.innerHTML = `<td>${currency}</td><td>${rateValue} ${fallbackBadge}</td>`;
             exchangeRatesTable.appendChild(row);
@@ -626,15 +678,16 @@ function updateRatesDisplaySection() {
     // Populate metal prices table
     metalPricesTable.innerHTML = '';
     const fallbackBadge = state.sources.metalPrices.isFallback ? '<span class="fallback-warning">fallback</span>' : '';
+    const symbol = getCurrencySymbol(base);
 
-    if (state.metalPrices.gold) {
+    if (state.metalPricesInBase.gold) {
         const goldRow = document.createElement('tr');
-        goldRow.innerHTML = `<td>Gold (per oz / per gram)</td><td>$${state.metalPrices.goldPerOz.toFixed(2)}/oz = $${state.metalPrices.gold.toFixed(2)}/g ${fallbackBadge}</td>`;
+        goldRow.innerHTML = `<td>Gold (per oz / per gram)</td><td>${symbol}${state.metalPricesInBase.goldPerOz.toFixed(2)}/oz = ${symbol}${state.metalPricesInBase.gold.toFixed(2)}/g ${fallbackBadge}</td>`;
         metalPricesTable.appendChild(goldRow);
     }
-    if (state.metalPrices.silver) {
+    if (state.metalPricesInBase.silver) {
         const silverRow = document.createElement('tr');
-        silverRow.innerHTML = `<td>Silver (per oz / per gram)</td><td>$${state.metalPrices.silverPerOz.toFixed(2)}/oz = $${state.metalPrices.silver.toFixed(2)}/g ${fallbackBadge}</td>`;
+        silverRow.innerHTML = `<td>Silver (per oz / per gram)</td><td>${symbol}${state.metalPricesInBase.silverPerOz.toFixed(2)}/oz = ${symbol}${state.metalPricesInBase.silver.toFixed(2)}/g ${fallbackBadge}</td>`;
         metalPricesTable.appendChild(silverRow);
     }
 
@@ -666,34 +719,39 @@ function updateStockPricesTable() {
     });
 }
 
-// Calculate cash total in USD
+// Calculate cash total in base currency
 function updateCashTotal() {
-    let totalUSD = 0;
+    let totalBase = 0;
+    const base = state.baseCurrency;
+    const symbol = getCurrencySymbol(base);
+
     document.querySelectorAll('#cash-inputs input').forEach(input => {
         const currency = input.dataset.currency;
         const amount = parseFloat(input.value) || 0;
 
-        if (amount > 0 && state.exchangeRates[currency]) {
-            // Convert to USD: amount / rate (since rate is units per USD)
-            totalUSD += amount / state.exchangeRates[currency];
+        if (amount > 0 && state.exchangeRates[currency] !== undefined) {
+            // Convert to base currency: amount / rate (since rate is units per 1 base)
+            totalBase += amount / state.exchangeRates[currency];
         }
     });
 
-    elements.cashTotal.textContent = `$${totalUSD.toFixed(2)}`;
-    return totalUSD;
+    elements.cashTotal.textContent = `${symbol}${totalBase.toFixed(2)}`;
+    return totalBase;
 }
 
-// Calculate metals total in USD
+// Calculate metals total in base currency
 function updateMetalsTotal() {
-    let totalUSD = 0;
+    let totalBase = 0;
+    const base = state.baseCurrency;
+    const symbol = getCurrencySymbol(base);
 
     // Gold
     document.querySelectorAll('#gold-inputs input').forEach(input => {
         const grams = parseFloat(input.value) || 0;
         const purity = parseFloat(input.dataset.purity) || 1.0;
 
-        if (grams > 0 && state.metalPrices.gold) {
-            totalUSD += grams * purity * state.metalPrices.gold;
+        if (grams > 0 && state.metalPricesInBase.gold) {
+            totalBase += grams * purity * state.metalPricesInBase.gold;
         }
     });
 
@@ -702,18 +760,21 @@ function updateMetalsTotal() {
         const grams = parseFloat(input.value) || 0;
         const purity = parseFloat(input.dataset.purity) || 1.0;
 
-        if (grams > 0 && state.metalPrices.silver) {
-            totalUSD += grams * purity * state.metalPrices.silver;
+        if (grams > 0 && state.metalPricesInBase.silver) {
+            totalBase += grams * purity * state.metalPricesInBase.silver;
         }
     });
 
-    elements.metalsTotal.textContent = `$${totalUSD.toFixed(2)}`;
-    return totalUSD;
+    elements.metalsTotal.textContent = `${symbol}${totalBase.toFixed(2)}`;
+    return totalBase;
 }
 
-// Calculate stocks total in USD
+// Calculate stocks total in base currency
+// Note: Stock prices are always entered in USD
 function updateStocksTotal() {
     let totalUSD = 0;
+    const base = state.baseCurrency;
+    const symbol = getCurrencySymbol(base);
 
     document.querySelectorAll('.stock-row').forEach(row => {
         const shares = parseFloat(row.querySelector('.stock-shares').value) || 0;
@@ -724,8 +785,14 @@ function updateStocksTotal() {
         }
     });
 
-    elements.stocksTotal.textContent = `$${totalUSD.toFixed(2)}`;
-    return totalUSD;
+    // Convert USD to base currency
+    let totalBase = totalUSD;
+    if (base !== 'USD' && state.exchangeRates['USD']) {
+        totalBase = totalUSD * state.exchangeRates['USD'];
+    }
+
+    elements.stocksTotal.textContent = `${symbol}${totalBase.toFixed(2)}`;
+    return totalBase;
 }
 
 // Main Zakat calculation
@@ -735,35 +802,43 @@ function calculateZakat() {
         return;
     }
 
-    // Calculate totals
+    const base = state.baseCurrency;
+    const symbol = getCurrencySymbol(base);
+
+    // Calculate totals (all in base currency)
     const cashTotal = updateCashTotal();
     const metalsTotal = updateMetalsTotal();
     const stocksTotal = updateStocksTotal();
     const totalWealth = cashTotal + metalsTotal + stocksTotal;
 
-    // Calculate Zakat (2.5%)
-    const zakatUSD = totalWealth * ZAKAT_RATE;
+    // Calculate Zakat (2.5%) in base currency
+    const zakatBase = totalWealth * ZAKAT_RATE;
 
-    // Display breakdown
-    document.getElementById('result-cash').textContent = `$${cashTotal.toFixed(2)}`;
-    document.getElementById('result-metals').textContent = `$${metalsTotal.toFixed(2)}`;
-    document.getElementById('result-stocks').textContent = `$${stocksTotal.toFixed(2)}`;
-    document.getElementById('result-total').textContent = `$${totalWealth.toFixed(2)}`;
+    // Display breakdown in base currency
+    document.getElementById('result-cash').textContent = `${symbol}${cashTotal.toFixed(2)}`;
+    document.getElementById('result-metals').textContent = `${symbol}${metalsTotal.toFixed(2)}`;
+    document.getElementById('result-stocks').textContent = `${symbol}${stocksTotal.toFixed(2)}`;
+    document.getElementById('result-total').textContent = `${symbol}${totalWealth.toFixed(2)}`;
+    document.getElementById('result-base-currency').textContent = base;
 
     // Display Zakat in multiple currencies
-    document.getElementById('zakat-usd').textContent = `$${zakatUSD.toFixed(2)}`;
+    // For base currency, show it first
+    document.getElementById('zakat-usd').textContent = `${symbol}${zakatBase.toFixed(2)}`;
+    // Update the label for the base currency display
+    document.querySelector('#zakat-usd').previousElementSibling.textContent = base;
 
-    if (state.exchangeRates.SAR) {
-        document.getElementById('zakat-sar').textContent =
-            `${(zakatUSD * state.exchangeRates.SAR).toFixed(2)} SAR`;
+    // Convert and show in other currencies
+    if (state.exchangeRates.SAR !== undefined) {
+        const zakatSAR = zakatBase * state.exchangeRates.SAR;
+        document.getElementById('zakat-sar').textContent = `${zakatSAR.toFixed(2)} SAR`;
     }
-    if (state.exchangeRates.PKR) {
-        document.getElementById('zakat-pkr').textContent =
-            `${(zakatUSD * state.exchangeRates.PKR).toFixed(2)} PKR`;
+    if (state.exchangeRates.PKR !== undefined) {
+        const zakatPKR = zakatBase * state.exchangeRates.PKR;
+        document.getElementById('zakat-pkr').textContent = `${zakatPKR.toFixed(2)} PKR`;
     }
-    if (state.exchangeRates.INR) {
-        document.getElementById('zakat-inr').textContent =
-            `${(zakatUSD * state.exchangeRates.INR).toFixed(2)} INR`;
+    if (state.exchangeRates.INR !== undefined) {
+        const zakatINR = zakatBase * state.exchangeRates.INR;
+        document.getElementById('zakat-inr').textContent = `${zakatINR.toFixed(2)} INR`;
     }
 
     // Show results

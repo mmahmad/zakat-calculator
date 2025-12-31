@@ -133,20 +133,31 @@ header .subtitle {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+.date-input-group,
+.currency-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
 .date-section label {
     font-weight: 600;
     color: #1a5a3c;
+    font-size: 0.9rem;
 }
 
-.date-section input[type="date"] {
+.date-section input[type="date"],
+.date-section select {
     padding: 10px 15px;
     border: 2px solid #ddd;
     border-radius: 8px;
     font-size: 1rem;
     transition: border-color 0.3s;
+    background: white;
 }
 
-.date-section input[type="date"]:focus {
+.date-section input[type="date"]:focus,
+.date-section select:focus {
     outline: none;
     border-color: #1a5a3c;
 }
