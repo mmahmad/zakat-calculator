@@ -236,7 +236,7 @@ header .subtitle {
 /* Stock Rows */
 .stock-row {
     display: grid;
-    grid-template-columns: 120px 100px 100px 100px auto auto;
+    grid-template-columns: 110px 90px 90px auto 90px auto;
     gap: 10px;
     align-items: center;
     padding: 10px;
@@ -261,10 +261,19 @@ header .subtitle {
     text-transform: uppercase;
 }
 
-.stock-price,
+.stock-price-input {
+    width: 100%;
+}
+
+.stock-lookup {
+    text-decoration: none;
+    text-align: center;
+}
+
 .stock-value {
-    font-size: 0.85rem;
-    color: #6c757d;
+    font-size: 0.9rem;
+    color: #1a5a3c;
+    font-weight: 600;
 }
 
 #add-stock-btn {

@@ -301,89 +301,57 @@ function findRatioForDate(csvText, targetDate) {
     return bestMatch;
 }
 
-// Fetch stock price for a specific symbol
-async function fetchStockPrice(button) {
-    const row = button.closest('.stock-row');
+// Set up stock row event listeners
+function setupStockRowListeners(row) {
     const symbolInput = row.querySelector('.stock-symbol');
-    const priceSpan = row.querySelector('.stock-price');
-    const valueSpan = row.querySelector('.stock-value');
     const sharesInput = row.querySelector('.stock-shares');
+    const priceInput = row.querySelector('.stock-price-input');
+    const lookupLink = row.querySelector('.stock-lookup');
+    const valueSpan = row.querySelector('.stock-value');
 
-    const symbol = symbolInput.value.trim().toUpperCase();
-    if (!symbol) {
-        priceSpan.textContent = 'Enter symbol';
-        return;
-    }
-
-    button.disabled = true;
-    priceSpan.textContent = 'Loading...';
-
-    try {
-        const price = await getStockPrice(symbol, state.calculationDate);
-        if (price !== null) {
-            state.stockPrices[symbol] = price;
-            priceSpan.textContent = `$${price.toFixed(2)}`;
-
-            // Update value if shares entered
-            const shares = parseFloat(sharesInput.value) || 0;
-            if (shares > 0) {
-                valueSpan.textContent = `$${(shares * price).toFixed(2)}`;
-            }
-
-            updateStocksTotal();
-            updateStockPricesTable(); // Update the rates display table
+    // Update lookup link when symbol changes
+    symbolInput.addEventListener('input', () => {
+        const symbol = symbolInput.value.trim().toUpperCase();
+        if (symbol) {
+            // Link to Yahoo Finance historical data page
+            lookupLink.href = `https://finance.yahoo.com/quote/${symbol}/history/`;
+            lookupLink.textContent = 'Look up';
         } else {
-            priceSpan.textContent = 'Not found';
+            lookupLink.href = '#';
+            lookupLink.textContent = 'Look up';
         }
-    } catch (error) {
-        console.error('Error fetching stock price:', error);
-        priceSpan.textContent = 'Error';
-    } finally {
-        button.disabled = false;
-    }
-}
+    });
 
-// Get stock price using Yahoo Finance
-async function getStockPrice(symbol, dateStr) {
-    try {
-        // Yahoo Finance API via a query
-        // Using the chart endpoint which is more reliable
-        const endDate = new Date(dateStr);
-        endDate.setDate(endDate.getDate() + 1);
-        const startDate = new Date(dateStr);
-        startDate.setDate(startDate.getDate() - 5); // Go back a few days to ensure we get data
+    // Update value when shares or price changes
+    const updateValue = () => {
+        const symbol = symbolInput.value.trim().toUpperCase();
+        const shares = parseFloat(sharesInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
 
-        const period1 = Math.floor(startDate.getTime() / 1000);
-        const period2 = Math.floor(endDate.getTime() / 1000);
-
-        // Using a CORS proxy for Yahoo Finance
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=1d`;
-
-        // Try direct fetch first (may work depending on browser/CORS)
-        const response = await fetch(url);
-
-        if (response.ok) {
-            const data = await response.json();
-            const result = data.chart.result?.[0];
-            if (result && result.indicators?.quote?.[0]?.close) {
-                const closes = result.indicators.quote[0].close.filter(c => c !== null);
-                if (closes.length > 0) {
-                    return closes[closes.length - 1]; // Last closing price
-                }
+        if (shares > 0 && price > 0) {
+            const value = shares * price;
+            valueSpan.textContent = `$${value.toFixed(2)}`;
+            // Store price in state for display in rates table
+            if (symbol) {
+                state.stockPrices[symbol] = price;
             }
+        } else {
+            valueSpan.textContent = 'Value: --';
         }
-    } catch (error) {
-        console.error('Yahoo Finance error:', error);
-    }
+        updateStocksTotal();
+        updateStockPricesTable();
+    };
 
-    // Fallback: prompt user for manual entry
-    const manualPrice = prompt(`Could not fetch price for ${symbol}. Enter the closing price manually (in USD):`);
-    if (manualPrice && !isNaN(parseFloat(manualPrice))) {
-        return parseFloat(manualPrice);
-    }
-
-    return null;
+    sharesInput.addEventListener('input', updateValue);
+    priceInput.addEventListener('input', updateValue);
 }
+
+// Initialize existing stock rows
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.stock-row').forEach(row => {
+        setupStockRowListeners(row);
+    });
+});
 
 // Add a new stock row
 function addStockRow() {
@@ -392,18 +360,15 @@ function addStockRow() {
     newRow.innerHTML = `
         <input type="text" class="stock-symbol" placeholder="Symbol (e.g., AAPL)" maxlength="10">
         <input type="number" class="stock-shares" step="0.0001" min="0" placeholder="Shares">
-        <span class="stock-price">Price: --</span>
+        <input type="number" class="stock-price-input" step="0.01" min="0" placeholder="Price ($)">
+        <a class="btn btn-small btn-fetch stock-lookup" href="#" target="_blank" rel="noopener">Look up</a>
         <span class="stock-value">Value: --</span>
-        <button class="btn btn-small btn-fetch" onclick="fetchStockPrice(this)">Fetch</button>
         <button class="btn btn-small btn-danger" onclick="removeStockRow(this)">×</button>
     `;
     elements.stocksContainer.appendChild(newRow);
 
-    // Add input listener for live updates
-    newRow.querySelector('.stock-shares').addEventListener('input', () => {
-        updateStockRowValue(newRow);
-        updateStocksTotal();
-    });
+    // Set up event listeners for the new row
+    setupStockRowListeners(newRow);
 }
 
 // Remove a stock row
@@ -413,29 +378,27 @@ function removeStockRow(button) {
 
     // Keep at least one row
     if (rows.length > 1) {
+        // Remove from state.stockPrices if it exists
+        const symbol = row.querySelector('.stock-symbol').value.trim().toUpperCase();
+        if (symbol && state.stockPrices[symbol]) {
+            delete state.stockPrices[symbol];
+        }
         row.remove();
         updateStocksTotal();
+        updateStockPricesTable();
     } else {
         // Clear the row instead
+        const symbol = row.querySelector('.stock-symbol').value.trim().toUpperCase();
+        if (symbol && state.stockPrices[symbol]) {
+            delete state.stockPrices[symbol];
+        }
         row.querySelector('.stock-symbol').value = '';
         row.querySelector('.stock-shares').value = '';
-        row.querySelector('.stock-price').textContent = 'Price: --';
+        row.querySelector('.stock-price-input').value = '';
         row.querySelector('.stock-value').textContent = 'Value: --';
+        row.querySelector('.stock-lookup').href = '#';
         updateStocksTotal();
-    }
-}
-
-// Update stock row value display
-function updateStockRowValue(row) {
-    const symbol = row.querySelector('.stock-symbol').value.trim().toUpperCase();
-    const shares = parseFloat(row.querySelector('.stock-shares').value) || 0;
-    const valueSpan = row.querySelector('.stock-value');
-
-    if (state.stockPrices[symbol] && shares > 0) {
-        const value = shares * state.stockPrices[symbol];
-        valueSpan.textContent = `$${value.toFixed(2)}`;
-    } else {
-        valueSpan.textContent = 'Value: --';
+        updateStockPricesTable();
     }
 }
 
@@ -622,11 +585,11 @@ function updateStocksTotal() {
     let totalUSD = 0;
 
     document.querySelectorAll('.stock-row').forEach(row => {
-        const symbol = row.querySelector('.stock-symbol').value.trim().toUpperCase();
         const shares = parseFloat(row.querySelector('.stock-shares').value) || 0;
+        const price = parseFloat(row.querySelector('.stock-price-input').value) || 0;
 
-        if (shares > 0 && state.stockPrices[symbol]) {
-            totalUSD += shares * state.stockPrices[symbol];
+        if (shares > 0 && price > 0) {
+            totalUSD += shares * price;
         }
     });
 
@@ -678,5 +641,4 @@ function calculateZakat() {
 }
 
 // Make functions available globally for onclick handlers
-window.fetchStockPrice = fetchStockPrice;
 window.removeStockRow = removeStockRow;
