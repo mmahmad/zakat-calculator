@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zakat Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Zakat Calculator</h1>
+            <p class="subtitle">Calculate your annual Zakat obligation</p>
+        </header>
+
+        <section class="date-section">
+            <label for="calculation-date">Calculation Date:</label>
+            <input type="date" id="calculation-date" required>
+            <button id="fetch-rates-btn" class="btn btn-primary">Fetch Rates for Date</button>
+            <div id="rates-status" class="status"></div>
+        </section>
+
+        <main class="calculator-sections">
+            <!-- Cash Section -->
+            <section class="asset-section">
+                <h2>💵 Cash Holdings</h2>
+                <p class="section-desc">Enter your cash amounts in each currency</p>
+                <div class="asset-grid" id="cash-inputs">
+                    <div class="asset-row">
+                        <label>USD (US Dollar)</label>
+                        <input type="number" data-currency="USD" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="USD">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>SAR (Saudi Riyal)</label>
+                        <input type="number" data-currency="SAR" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="SAR">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>PKR (Pakistani Rupee)</label>
+                        <input type="number" data-currency="PKR" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="PKR">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>INR (Indian Rupee)</label>
+                        <input type="number" data-currency="INR" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="INR">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>CNY (Chinese Yuan)</label>
+                        <input type="number" data-currency="CNY" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="CNY">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>AED (UAE Dirham)</label>
+                        <input type="number" data-currency="AED" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="AED">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>QAR (Qatari Riyal)</label>
+                        <input type="number" data-currency="QAR" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="QAR">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>BHD (Bahraini Dinar)</label>
+                        <input type="number" data-currency="BHD" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="BHD">Rate: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>OMR (Omani Rial)</label>
+                        <input type="number" data-currency="OMR" step="0.01" min="0" placeholder="0.00">
+                        <span class="rate-display" data-rate-for="OMR">Rate: --</span>
+                    </div>
+                </div>
+                <div class="section-total">
+                    Cash Total (USD): <span id="cash-total">$0.00</span>
+                </div>
+            </section>
+
+            <!-- Precious Metals Section -->
+            <section class="asset-section">
+                <h2>🥇 Precious Metals</h2>
+                <p class="section-desc">Enter weight in grams</p>
+
+                <h3>Gold</h3>
+                <div class="asset-grid" id="gold-inputs">
+                    <div class="asset-row">
+                        <label>Pure Gold (24K Bar)</label>
+                        <input type="number" data-metal="gold" data-purity="1.0" step="0.01" min="0" placeholder="0.00 grams">
+                        <span class="rate-display" data-rate-for="gold-24k">Price: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>22K Gold Jewelry</label>
+                        <input type="number" data-metal="gold" data-purity="0.9167" step="0.01" min="0" placeholder="0.00 grams">
+                        <span class="rate-display" data-rate-for="gold-22k">Price: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>18K Gold Jewelry</label>
+                        <input type="number" data-metal="gold" data-purity="0.75" step="0.01" min="0" placeholder="0.00 grams">
+                        <span class="rate-display" data-rate-for="gold-18k">Price: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>15K Gold Jewelry</label>
+                        <input type="number" data-metal="gold" data-purity="0.625" step="0.01" min="0" placeholder="0.00 grams">
+                        <span class="rate-display" data-rate-for="gold-15k">Price: --</span>
+                    </div>
+                    <div class="asset-row">
+                        <label>10K Gold Jewelry</label>
+                        <input type="number" data-metal="gold" data-purity="0.4167" step="0.01" min="0" placeholder="0.00 grams">
+                        <span class="rate-display" data-rate-for="gold-10k">Price: --</span>
+                    </div>
+                </div>
+
+                <h3>Silver</h3>
+                <div class="asset-grid" id="silver-inputs">
+                    <div class="asset-row">
+                        <label>Pure Silver</label>
+                        <input type="number" data-metal="silver" data-purity="1.0" step="0.01" min="0" placeholder="0.00 grams">
+                        <span class="rate-display" data-rate-for="silver">Price: --</span>
+                    </div>
+                </div>
+                <div class="section-total">
+                    Metals Total (USD): <span id="metals-total">$0.00</span>
+                </div>
+            </section>
+
+            <!-- Stocks Section -->
+            <section class="asset-section">
+                <h2>📈 US Stocks</h2>
+                <p class="section-desc">Add your stock holdings</p>
+                <div id="stocks-container">
+                    <div class="stock-row">
+                        <input type="text" class="stock-symbol" placeholder="Symbol (e.g., AAPL)" maxlength="10">
+                        <input type="number" class="stock-shares" step="0.0001" min="0" placeholder="Shares">
+                        <span class="stock-price">Price: --</span>
+                        <span class="stock-value">Value: --</span>
+                        <button class="btn btn-small btn-fetch" onclick="fetchStockPrice(this)">Fetch</button>
+                        <button class="btn btn-small btn-danger" onclick="removeStockRow(this)">×</button>
+                    </div>
+                </div>
+                <button id="add-stock-btn" class="btn btn-secondary">+ Add Stock</button>
+                <div class="section-total">
+                    Stocks Total (USD): <span id="stocks-total">$0.00</span>
+                </div>
+            </section>
+        </main>
+
+        <!-- Results Section -->
+        <section class="results-section">
+            <h2>📊 Zakat Calculation</h2>
+            <button id="calculate-btn" class="btn btn-primary btn-large">Calculate Zakat</button>
+
+            <div id="results" class="results-container" style="display: none;">
+                <div class="result-breakdown">
+                    <h3>Total Wealth Breakdown</h3>
+                    <div class="breakdown-item">
+                        <span>Cash Holdings:</span>
+                        <span id="result-cash">$0.00</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span>Precious Metals:</span>
+                        <span id="result-metals">$0.00</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span>Stocks:</span>
+                        <span id="result-stocks">$0.00</span>
+                    </div>
+                    <div class="breakdown-item total">
+                        <span>Total Wealth (USD):</span>
+                        <span id="result-total">$0.00</span>
+                    </div>
+                </div>
+
+                <div class="zakat-results">
+                    <h3>Zakat Due (2.5%)</h3>
+                    <div class="zakat-amounts">
+                        <div class="zakat-amount">
+                            <span class="currency-label">USD</span>
+                            <span class="amount" id="zakat-usd">$0.00</span>
+                        </div>
+                        <div class="zakat-amount">
+                            <span class="currency-label">SAR</span>
+                            <span class="amount" id="zakat-sar">0.00</span>
+                        </div>
+                        <div class="zakat-amount">
+                            <span class="currency-label">PKR</span>
+                            <span class="amount" id="zakat-pkr">0.00</span>
+                        </div>
+                        <div class="zakat-amount">
+                            <span class="currency-label">INR</span>
+                            <span class="amount" id="zakat-inr">0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Zakat Rate: 2.5% of total eligible wealth</p>
+            <p class="disclaimer">Note: This calculator provides estimates. Consult a scholar for specific rulings.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
