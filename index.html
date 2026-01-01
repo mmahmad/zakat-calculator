@@ -19,21 +19,14 @@
                 <summary>How to Use This Calculator</summary>
                 <div class="instructions-content">
                     <ol>
-                        <li><strong>Select a calculation date</strong> — Choose the date for which you want to calculate Zakat (e.g., your Zakat anniversary date).</li>
-                        <li><strong>Choose your base currency</strong> — Select the currency you want all values and results displayed in.</li>
-                        <li><strong>Fetch rates</strong> — Click "Fetch Rates for Date" to get exchange rates and metal prices for that date.</li>
-                        <li><strong>Enter your assets:</strong>
-                            <ul>
-                                <li><strong>Cash:</strong> Enter amounts in each currency you hold.</li>
-                                <li><strong>Precious Metals:</strong> Enter the weight in grams for gold (by purity) and silver.</li>
-                                <li><strong>Stocks:</strong> Enter US stock symbols and number of shares. Prices are always in USD. Either use "Fetch Prices" (requires running the local server) or click "Look up" to find prices on Yahoo Finance and enter them manually.</li>
-                            </ul>
-                        </li>
-                        <li><strong>Calculate</strong> — Click "Calculate Zakat" to see your total wealth and Zakat due (2.5%) in your chosen base currency and others.</li>
+                        <li><strong>Start the server</strong> — Run <code>python server.py</code> in your terminal.</li>
+                        <li><strong>Select a calculation date</strong> — Choose the date for which you want to calculate Zakat.</li>
+                        <li><strong>Choose your base currency</strong> — Select the currency for displaying values and results.</li>
+                        <li><strong>Enter stock symbols</strong> — If you have US stocks, enter the symbols before fetching rates.</li>
+                        <li><strong>Fetch rates</strong> — Click "Fetch Rates" to get all data (exchange rates, metal prices, stock prices).</li>
+                        <li><strong>Enter your assets</strong> — Fill in cash amounts, metal weights, and stock shares.</li>
+                        <li><strong>Calculate</strong> — Click "Calculate Zakat" to see your total wealth and Zakat due (2.5%).</li>
                     </ol>
-                    <div class="instructions-note">
-                        <strong>Optional:</strong> To auto-fetch stock prices, run <code>pip install -r requirements.txt && python server.py</code> in your terminal.
-                    </div>
                 </div>
             </details>
         </section>
@@ -220,11 +213,9 @@
             <!-- Stocks Section -->
             <section class="asset-section">
                 <h2>📈 US Stocks</h2>
-                <p class="section-desc">Enter stock symbols and shares. Prices are in USD. Use "Fetch Prices" if server is running, or look up manually.</p>
+                <p class="section-desc">Enter stock symbols and shares. Prices (in USD) are fetched automatically when you click "Fetch Rates".</p>
                 <div class="stock-server-status">
                     <span id="server-status" class="server-status offline">Server: Checking...</span>
-                    <button id="fetch-all-stocks-btn" class="btn btn-small btn-fetch" disabled>Fetch Prices</button>
-                    <span class="server-hint">Run <code>python server.py</code> to enable auto-fetch</span>
                 </div>
                 <div id="stocks-container">
                     <div class="stock-row">
